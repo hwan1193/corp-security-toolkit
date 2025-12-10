@@ -26,16 +26,20 @@ RSC 점검 도구(rsc_check) 소개
 
 제공처: Piolink
 
-보안 공지: Piolink 보안 분석 페이지
+공식 안내: https://www.piolink.com/kr/service/Security-Analysis.php?bbsCode=security&vType=view&idx=178&page=1
 
 지원 OS: Linux (CentOS, Ubuntu 등)
 
-Windows 환경에서는 WSL(Windows Subsystem for Linux) 상에서 사용 가능
+Windows에서는 WSL(Windows Subsystem for Linux) 환경에서 활용 가능
 
-형식: ELF 실행 파일 (설치 불필요, 실행만으로 점검)
+형식: ELF 실행 파일
+
+별도 설치 없이 실행만으로 점검 가능
 
 특징
 
-개인정보 수집/외부 전송 기능 없음
+개인정보 수집 없음
 
-보조 진단용 도구 (100% 탐지 X → 참고 지표로 사용)
+외부 전송 기능 없음
+
+보조 진단용 도구 (100% 탐지 X → 다른 점검 결과와 함께 해석 필요)
