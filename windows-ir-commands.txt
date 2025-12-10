@@ -1,0 +1,198 @@
+# Windows 보안 점검 / IR 명령어 모음집
+
+운영 서버·클라이언트에서 **계정 / 네트워크 / 서비스 / 로그 / 하드닝 / 공격 흔적**을 빠르게 확인하기 위한 PowerShell & CLI 치트시트.
+
+---
+
+## 1. 계정 / 권한 점검
+
+```powershell
+# 로컬 사용자
+Get-LocalUser
+
+# 로컬 관리자 그룹
+Get-LocalGroupMember Administrators
+```
+
+```powershell
+# 최근 7일 내 암호 설정(신규/변경)
+Get-LocalUser | Where-Object {
+    $_.PasswordLastSet -gt (Get-Date).AddDays(-7)
+}
+```
+
+```powershell
+# 도메인 암호 정책
+net accounts /domain
+
+# 로컬 암호 정책
+net accounts
+```
+
+```powershell
+# RDP 접속 허용 여부 (0: 허용, 1: 차단)
+(Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server").fDenyTSConnections
+```
+
+---
+
+## 2. 네트워크 / 세션 / 포트
+
+```powershell
+# 현재 ESTABLISHED 세션
+Get-NetTCPConnection | Where-Object {$_.State -eq "Established"}
+```
+
+- Azure 환경에서 자주 보이는 정상 IP
+  - `168.63.129.16` : Azure 헬스 체크 / DNS / 시간 동기화
+  - `169.254.169.254` : Instance Metadata Service(IMDS)
+
+```powershell
+# 방화벽 룰
+Get-NetFirewallRule | Select DisplayName, Enabled, Direction, Action
+
+# 활성 네트워크 프로필
+Get-NetConnectionProfile
+```
+
+```powershell
+# 최근 원격 로그인 성공
+Get-WinEvent -LogName Security |
+  Where-Object { $_.Id -eq 4624 } |
+  Select-Object -First 5 TimeCreated, Message
+```
+
+---
+
+## 3. 서비스 / 프로세스 / 시작 프로그램
+
+```powershell
+# 자동 시작인데 꺼져 있는 서비스
+Get-Service | Where-Object {
+    $_.StartType -eq "Automatic" -and $_.Status -ne "Running"
+}
+```
+
+```powershell
+# 프로세스 + 경로 + 회사
+Get-Process | Select Name, Id, Path, Company
+```
+
+```powershell
+# 예약 작업
+Get-ScheduledTask | Select TaskName, State, Actions
+
+# 시작 프로그램
+Get-CimInstance Win32_StartupCommand | Select Name, Command
+```
+
+---
+
+## 4. Sysmon 환경 (있으면 활용)
+
+```powershell
+# Sysmon 서비스 상태
+Get-Service sysmon*
+```
+
+```powershell
+# 최근 Sysmon 이벤트 20개
+Get-WinEvent -LogName "Microsoft-Windows-Sysmon/Operational" -MaxEvents 20
+```
+
+---
+
+## 5. 파일 변조 / 최근 변경
+
+```powershell
+# 최근 24시간 변경 파일
+Get-ChildItem -Path C:\ -Recurse -ErrorAction SilentlyContinue |
+  Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-1) } |
+  Select FullName, LastWriteTime, Length
+```
+
+```powershell
+# 의심 확장자
+Get-ChildItem -Path C:\ -Recurse -Include *.ps1,*.vbs,*.bat,*.exe -ErrorAction SilentlyContinue
+```
+
+---
+
+## 6. 악성 행위 / 멀웨어 흔적 (Defender 기준)
+
+```powershell
+# PowerShell 로그 지원 여부
+Get-WinEvent -ListLog *PowerShell*
+```
+
+```powershell
+# Defender 상태
+Get-MpComputerStatus |
+  Select AMServiceEnabled, AntispywareEnabled, AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled
+```
+
+```powershell
+# 최근 탐지 이력
+Get-MpThreat
+
+# 빠른 검사
+Start-MpScan -ScanType QuickScan
+```
+
+---
+
+## 7. OS 하드닝 체크
+
+```powershell
+# SMBv1 비활성화 여부
+Get-SmbServerConfiguration | Select EnableSMB1Protocol
+```
+
+```powershell
+# RDP 암호화 레벨
+Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" |
+  Select MinEncryptionLevel
+```
+
+```powershell
+# TLS 프로토콜 키
+Get-ChildItem "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols"
+```
+
+---
+
+## 8. 공격 흔적 (Security 로그)
+
+```powershell
+# 로그인 실패 (Brute Force, RDP 공격)
+Get-WinEvent -LogName Security |
+  Where-Object { $_.Id -eq 4625 } |
+  Select TimeCreated, Message
+```
+
+```powershell
+# 관리자 권한 부여
+Get-WinEvent -LogName Security |
+  Where-Object { $_.Id -eq 4672 }
+```
+
+```powershell
+# 계정 생성
+Get-WinEvent -LogName Security |
+  Where-Object { $_.Id -eq 4720 }
+```
+
+---
+
+## 9. 외부 노출 포트 차단 예시
+
+```powershell
+# RDP: Domain/Private만 허용, Public 차단
+Set-NetFirewallRule -DisplayGroup "Remote Desktop" -Enabled True -Profile Domain,Private
+Set-NetFirewallRule -DisplayGroup "Remote Desktop" -Profile Public -Enabled False
+
+# WinRM HTTP Public 차단
+Set-NetFirewallRule -Name "WINRM-HTTP-In-TCP" -Profile Public -Enabled False
+```
+
+이 파일은 “윈도우 한 대 붙었을 때 뭘 먼저 볼지”에 대한 IR 치트시트로 사용한다.

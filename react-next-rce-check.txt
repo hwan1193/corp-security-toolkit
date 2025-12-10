@@ -1,0 +1,265 @@
+# React / Next.js RSC 취약점 점검 가이드  
+CVE-2025-55182 (React), CVE-2025-66478 (Next.js)
+
+## 1. 취약점 개요
+
+### 1.1 React Server Components (RSC)란?
+
+- 서버에서 렌더링·실행되는 React 컴포넌트
+- 서버 측 코드 취약 시 **원격 코드 실행(RCE)** 직결 가능
+
+### 1.2 이번 취약점 요약
+
+- 인증 없이 RSC를 악용해 원격 코드를 실행할 수 있는 취약점
+- Next.js에 포함된 React 서버 패키지에서 발견
+- RSC 기반 서비스는 **고위험(HIGH RISK)** 으로 간주
+
+#### CVE 정보
+
+- **CVE-2025-66478 (Next.js)**
+  - 영향 버전: Next.js **15.x, 16.x**
+- **CVE-2025-55182 (React)**
+  - 영향 버전: React **19.0.0 ~ 19.2.0**
+
+---
+
+## 2. 점검 전략
+
+1. **버전 점검**  
+   - `npm ls`, `package.json` 으로 React / Next.js 버전 확인
+2. **런타임 점검**  
+   - Piolink `rsc_check` 도구로 실제 URL 대상 점검
+3. **종합 판단**  
+   - 버전이 안전하고 + `rsc_check` 결과도 정상일 때 “패치 완료”로 판단
+
+---
+
+## 3. React / Next.js 버전 확인
+
+### 3.1 단일 프로젝트
+
+```powershell
+cd D:\src\tx-admin-react
+
+npm ls next react react-dom react-server-dom-webpack --depth=0
+```
+
+정상 예시(느낌):
+
+```text
+next@16.0.7
+react@19.2.1
+react-dom@19.2.1
+react-server-dom-webpack@19.2.1
+```
+
+- Next.js: **15.0.5 이상** 또는 **16.0.7 이상**
+- React / react-dom / react-server-dom-webpack: **19.0.1 / 19.1.2 / 19.2.1 이상**
+
+### 3.2 여러 프로젝트 일괄 확인
+
+```powershell
+$projects = @(
+  "D:\src\tx-admin-react",
+  "D:\src\tx-front-react",
+  "D:\src\tx-inquiry-system",
+  "D:\src\tx-livechat",
+  "D:\src\tx-smart-warehouse",
+  "D:\src\smartpost-react"
+)
+
+foreach ($p in $projects) {
+    Write-Host "`n=== $p ==="
+    if (Test-Path $p) {
+        Push-Location $p
+        npm ls next react react-dom react-server-dom-webpack --depth=0 2>$null
+        Pop-Location
+    } else {
+        Write-Host "폴더 없음: $p"
+    }
+}
+```
+
+### 3.3 `package.json` 직접 파싱 (npm 없이)
+
+```powershell
+cd D:\src\tx-admin-react
+
+$pkg = Get-Content package.json -Raw | ConvertFrom-Json
+"next:        $($pkg.dependencies.next)"
+"react:       $($pkg.dependencies.react)"
+"react-dom:   $($pkg.dependencies.'react-dom')"
+```
+
+---
+
+## 4. RSC 점검 도구 `rsc_check` 소개
+
+- **도구명**: RSC(React Server Components) 점검 도구 `rsc_check`
+- **제공처**: Piolink  
+  - 안내: https://www.piolink.com/kr/service/Security-Analysis.php?bbsCode=security&vType=view&idx=178&page=1
+- **지원 OS**: Linux (CentOS, Ubuntu 등)
+  - Windows에서는 **WSL** 환경에서 사용
+- **형식**: ELF 실행 파일 (설치 불필요, 실행만으로 점검)
+- **특징**
+  - 개인정보 수집 / 외부 전송 없음
+  - 보조 진단용 도구 (100% 탐지 X)
+
+---
+
+## 5. rsc_check 사용 방법
+
+### 5.1 WSL에서 실행 (Windows 기준)
+
+1. `RSC_check_[PIOLINK_CTA].zip` 을 예: `C:\Tools` 에 압축 해제
+2. 실행 권한 부여
+
+```powershell
+wsl chmod +x /mnt/c/Tools/rsc_check
+```
+
+3. 단일 URL 점검
+
+```powershell
+wsl /mnt/c/Tools/rsc_check https://smartpost.tracxlogis.com
+```
+
+4. 여러 URL 점검 (`targets.txt` 사용)
+
+```powershell
+# C:\Tools\targets.txt 작성 후
+wsl /mnt/c/Tools/rsc_check -f /mnt/c/Tools/targets.txt
+```
+
+### 5.2 리눅스 서버에서 실행
+
+```bash
+unzip RSC_check_[PIOLINK_CTA].zip
+chmod +x rsc_check
+
+./rsc_check https://service.example.com
+./rsc_check -f targets.txt
+```
+
+---
+
+## 6. rsc_check 결과 예시 & 해석
+
+### 6.1 정상 예시
+
+```text
+--- URL: https://piolink.com ---
+[*] Analyzing https://piolink.com for Next.js CVE-2025-66478 & React CVE-2025-55182...
+[-] 'x-nextjs-version' header not found. Cannot verify specific version.
+```
+
+- RSC 프로토콜 또는 취약 패턴 확인 안 됨
+- 다만 `x-nextjs-version` 헤더가 없으므로, **반드시 버전 점검 결과와 함께** 해석
+
+### 6.2 취약 예시
+
+```text
+--- URL: http://127.0.0.1:3000 ---
+[*] Analyzing http://127.0.0.1:3000 for Next.js CVE-2025-66478 & React CVE-2025-55182...
+[!] **RSC Protocol Detected.** Target is using React Server Components.
+[-] 'x-nextjs-version' header not found. Cannot verify specific version.
+[!!!] CRITICAL: RSC is enabled but version is hidden. Treat as HIGHLY VULNERABLE.
+```
+
+- `RSC Protocol Detected.` → RSC 기반 서비스
+- `CRITICAL` → RSC 활성 + 버전 숨김 상태  
+  → **고위험 취약점**, 즉시 패치 검토
+
+---
+
+## 7. 대응 방안 (패치 가이드)
+
+1. **React 서버 패키지 업데이트**
+   - 19.0.1 / 19.1.2 / 19.2.1 등 안전 버전 이상으로 업그레이드
+
+2. **Next.js 업데이트**
+   - 최소: **15.0.5 이상** 또는 **16.0.7 이상**
+
+3. **기타 RSC 기반 프레임워크**
+   - 각 프레임워크의 보안 공지·패치 가이드에 맞춰 업데이트
+
+4. **조치 후 재점검 플로우**
+
+   1) `npm ls` / `package.json`으로 버전 재확인  
+   2) `rsc_check` 재실행  
+   3) 결과 캡처 → 보고서, ISO/ISMS 증적, 배포 관리대장 첨부
+
+---
+
+## 8. 파일 무결성 검증
+
+### 8.1 Zip 파일
+
+- 파일명: `RSC_check_[PIOLINK_CTA].zip`
+- SHA256: `b1cb3c94c27547324dc150e48ef3b40f6edb28e0341bc3c7d44e1b9d526a0f19`
+- MD5: `e8729fe6d9e33b51f5e90e100e439144`
+
+### 8.2 실행 파일 `rsc_check`
+
+- SHA256: `c28cac0b0245acdc0217795ab826a189a2560ed992fc07dc7719ee846d3667f8`
+- MD5: `19112c10c7a0332b2b3d049467958f4a`
+
+### 8.3 해시 검증 예시
+
+```bash
+sha256sum RSC_check_[PIOLINK_CTA].zip
+sha256sum rsc_check
+
+md5sum RSC_check_[PIOLINK_CTA].zip
+md5sum rsc_check
+```
+
+출력값이 위 해시와 일치하면 정상 파일로 본다.
+
+---
+
+## 9. 부록: RDP 아웃바운드 흔적 확인 스크립트
+
+```powershell
+$TargetIp = "40.160.19.218"
+
+$result = [pscustomobject]@{
+    ComputerName   = $env:COMPUTERNAME
+    Found          = $false
+    LogSource      = $null
+    FirstEventTime = $null
+}
+
+$logNames = @(
+  "Microsoft-Windows-TerminalServices-ClientActiveXCore/Operational",
+  "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"
+)
+
+foreach ($log in $logNames) {
+    if (Get-WinEvent -ListLog $log -ErrorAction SilentlyContinue) {
+        $evt = Get-WinEvent -LogName $log -MaxEvents 2000 -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match $TargetIp } |
+            Select-Object -First 1
+        if ($evt) {
+            $result.Found = $true
+            $result.LogSource = $log
+            $result.FirstEventTime = $evt.TimeCreated
+            break
+        }
+    }
+}
+
+$result
+$result | Export-Csv "C:\sec\rdp_outbound_scan.csv" -Append -NoTypeInformation
+```
+
+---
+
+## 10. 주의사항
+
+- `rsc_check` 는 **보조 진단용**이다.  
+- 실제 대응은
+  - 버전 패치 여부
+  - 코드 리뷰
+  - WAF/방화벽/EDR 로그  
+  와 함께 종합적으로 판단해야 한다.
