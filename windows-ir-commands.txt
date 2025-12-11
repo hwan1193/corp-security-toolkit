@@ -232,6 +232,40 @@ Get-WinEvent -LogName Security |
   Where-Object { $_.Id -eq 4720 }
 ```
 
+```powershell
+# Found = True 가 나오면 해당 VM 40.160.19.218로 RDP 접속 흔적 나와요~
+$TargetIp = "40.160.19.218"
+ 
+$result = [pscustomobject]@{
+    ComputerName   = $env:COMPUTERNAME
+    Found          = $false
+    LogSource      = $null
+    FirstEventTime = $null
+}
+ 
+$logNames = @(
+  "Microsoft-Windows-TerminalServices-ClientActiveXCore/Operational",
+  "Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"
+)
+ 
+foreach ($log in $logNames) {
+    if (Get-WinEvent -ListLog $log -ErrorAction SilentlyContinue) {
+        $evt = Get-WinEvent -LogName $log -MaxEvents 2000 -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match $TargetIp } |
+            Select-Object -First 1
+        if ($evt) {
+            $result.Found = $true
+            $result.LogSource = $log
+            $result.FirstEventTime = $evt.TimeCreated
+            break
+        }
+    }
+}
+ 
+$result
+$result | Export-Csv "C:\sec\rdp_outbound_scan.csv" -Append -NoTypeInformation
+```
+
 ---
 
 ## 9. 외부 노출 포트 차단 예시
