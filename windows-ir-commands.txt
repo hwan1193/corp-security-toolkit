@@ -112,6 +112,51 @@ Get-ChildItem -Path C:\ -Recurse -ErrorAction SilentlyContinue |
 ```
 
 ```powershell
+# 웹 루트만 타겟으로 다시 보기
+$since = (Get-Date).AddDays(-1)
+
+Get-ChildItem "C:\inetpub\wwwroot" -Recurse -File -ErrorAction SilentlyContinue |
+  Where-Object { $_.LastWriteTime -gt $since } |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object FullName, LastWriteTime, Length
+```
+
+```powershell
+# Temp 쪽에서 수상한 실행 파일 찾기
+$since = (Get-Date).AddDays(-1)
+
+Get-ChildItem "C:\Windows\Temp","C:\Windows\SystemTemp" -Recurse -File -ErrorAction SilentlyContinue |
+  Where-Object { $_.LastWriteTime -gt $since } |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object FullName, LastWriteTime, Length
+
+# 여기서 .exe / .dll / .ps1 / .bat 같은 거 뜨면 개별 파일 체크 할 수 있음.
+```
+
+```powershell
+# 시스템 밖(비정상 위치)의 새 exe/스크립트 스캔
+$since = (Get-Date).AddDays(-1)
+
+Get-ChildItem C:\ -Recurse -File -Include *.exe,*.dll,*.ps1,*.bat,*.vbs,*.js -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.LastWriteTime -gt $since -and
+    $_.FullName -notlike 'C:\Windows\*' -and
+    $_.FullName -notlike 'C:\Program Files*'
+  } |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object FullName, LastWriteTime, Length
+# 여기서 뭔가 의도한 설치/업데이트가 아닌데 뜬 실행 파일 있으면 바로 의심 대상 할 수 있음.
+```
+
+```powershell
+# ASP.NET Temp가 너무 많을 경우..
+Get-ChildItem "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Temporary ASP.NET Files\gmkt.inc.glps.admin.web" -Recurse -File |
+  Group-Object Extension |
+  Sort-Object Count -Descending
+# 여기에 .dll, .compiled, .pdb 비슷한 것만 잔뜩이면 거의 정상 패턴이지만, 여기 안에 .exe, .ps1, .bat 같은 건 원래 안 나와야 해서 그런 건 바로 찍어서 봄.
+```
+
+```powershell
 # 의심 확장자
 Get-ChildItem -Path C:\ -Recurse -Include *.ps1,*.vbs,*.bat,*.exe -ErrorAction SilentlyContinue
 ```
