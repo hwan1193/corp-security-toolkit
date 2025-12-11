@@ -203,6 +203,10 @@ Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStat
 ```powershell
 # TLS 프로토콜 키
 Get-ChildItem "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols"
+
+# SSL/TLS 활성화 여부 확인용
+Get-ItemProperty `
+  "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 3.0\Server"
 ```
 
 ---
