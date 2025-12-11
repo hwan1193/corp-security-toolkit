@@ -233,7 +233,7 @@ Get-WinEvent -LogName Security |
 ```
 
 ```powershell
-# Found = True 가 나오면 해당 VM 40.160.19.218로 RDP 접속 흔적 나와요~
+# Found = True 가 나오면 해당 VM 40.1XX.XXX.XXX로 RDP 접속 흔적 나와요~
 $TargetIp = "40.160.19.218"
  
 $result = [pscustomobject]@{
