@@ -119,6 +119,7 @@ Get-ChildItem "C:\inetpub\wwwroot" -Recurse -File -ErrorAction SilentlyContinue 
   Where-Object { $_.LastWriteTime -gt $since } |
   Sort-Object LastWriteTime -Descending |
   Select-Object FullName, LastWriteTime, Length
+# 파일 이름이 이상한 것 (a.aspx, 1.aspx, cmd.aspx 이런 웹셸 스타일)
 ```
 
 ```powershell
