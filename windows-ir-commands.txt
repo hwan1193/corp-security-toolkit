@@ -221,7 +221,7 @@ Get-WinEvent -LogName Security |
 ```
 
 ```powershell
-# 관리자 권한 부여
+# 관리자 권한 부여 (로그 확인용)
 Get-WinEvent -LogName Security |
   Where-Object { $_.Id -eq 4672 }
 ```
